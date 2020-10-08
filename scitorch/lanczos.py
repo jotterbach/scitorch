@@ -90,5 +90,5 @@ def spectral_density_estimation(
     _w = weights.flatten()[np.newaxis, :]
     
     exponent = - 0.5 * (_x - _n)**2 / sigma**2
-    spectrum = (_w * np.exp(exponent)).sum(axis=-1) / K
+    spectrum = (_w * np.exp(exponent) / np.sqrt(2*np.pi * sigma**2)).sum(axis=-1) / K
     return spectrum
