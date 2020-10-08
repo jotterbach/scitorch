@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, Tuple
 
 import numpy as np
 from tqdm import tqdm
@@ -6,17 +6,29 @@ import torch
 
 
 def reorthogonalize(v: torch.Tensor, B: torch.Tensor):
+    """
+    Reorthogonalization procedure based on parallelized Gram-Schmidt.
+    """
     assert v.size(0) == B.size(0)
     overlap = v @ B
     _v = v - (overlap.unsqueeze(0) * B).sum(dim=-1)
     return _v
 
 
-def lanczos(mat_vec_mul_closure: Callable[[torch.Tensor], torch.Tensor],
-            num_params: int,
-            num_iter: int,
-            orthogonalize: bool = False):
-    
+def lanczos(
+    mat_vec_mul_closure: Callable[[torch.Tensor], torch.Tensor],
+    num_params: int,
+    num_iter: int,
+    orthogonalize: bool = False) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    Straightup implementation of the Lanczos-algorithm as found at https://en.wikipedia.org/wiki/Lanczos_algorithm. We added optional re-orthogonalization to improve numerical stability.
+
+    :param mat_vec_mul_closure: Callable computing the matrix-vector product between the matrix of interest and a given vector.
+    :num_params: Integer denoting the dimensionality of the matrix.
+    :num_iter: Number of eigenvalues that should be approximated in the Lanczos algorithm.
+    :orthogonalize: True if the routine should use full re-orthogonalization (improves numerical stability).
+    """
+
     v_j = torch.randn(num_params)
     v_j_1 = torch.zeros_like(v_j)
     v_j /= v_j.norm(p=2)
@@ -57,7 +69,17 @@ def stochastic_lanczos_quadrature(
     num_params: int,
     num_lanczos_iter: int,
     num_stochastic_iter: int,
-    orthogonalize: bool = False):
+    orthogonalize: bool = False) -> Tuple[np.ndarray, np.ndarray]:
+
+    """
+    The Stochastic Lanczos Quadrature (https://www.ams.org/journals/mcom/1969-23-106/S0025-5718-69-99647-1/S0025-5718-69-99647-1.pdf) approximates the first `num_lanczos_iter` eigenvalues of the matrix of interest. It uses these as the nodes in a Mixture of Gaussian model of the density. The weights of the mixtures is estimated by the squared components of the first eigenvector of the Lanczos-T diagonalization.
+
+    :param mat_vec_mul_closure: Callable computing the matrix-vector product between the matrix of interest and a given vector.
+    :num_params: Integer denoting the dimensionality of the matrix.
+    :num_lanczos_iter: Number of eigenvalues that should be approximated in the Lanczos algorithm.
+    :num_stochastic_iter: Number of times the Lanczos estimator should be run.
+    :orthogonalize: True if the Lanczos subroutine should use full re-orthogonalization (improves numerical stability).
+    """
 
     nodes_ensemble = []
     weights_ensemble = []
@@ -81,7 +103,15 @@ def spectral_density_estimation(
     x: np.ndarray,
     nodes: np.ndarray,
     weights: np.ndarray,
-    sigma: float):
+    sigma: float) -> np.ndarray:
+    """
+    Spectral density estimator evaluates a Mixture of Gaussian model on positions `x` centered at `nodes` with width `sigma` and mixture contributions given by the `weights`.
+
+    :param x: Points at which the spectral density should be evaluated.
+    :param nodes: centers of the Gaussians in the mixture.
+    :param weights: contribution of the Gaussians in the mixture.
+    :param sigma: Standard deviation of the Gaussians.
+    """
 
     K = nodes.shape[0]
     assert K == weights.shape[0], "Nodes and weights of the density estimator are not equal"
