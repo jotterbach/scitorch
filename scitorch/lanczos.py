@@ -1,4 +1,7 @@
 from typing import Callable
+
+import numpy as np
+from tqdm import tqdm
 import torch
 
 
@@ -48,3 +51,44 @@ def lanczos(mat_vec_mul_closure: Callable[[torch.Tensor], torch.Tensor],
             
     return V, T
 
+
+def stochastic_lanczos_quadrature(
+    mat_vec_mul_closure: Callable[[torch.Tensor], torch.Tensor],
+    num_params: int,
+    num_lanczos_iter: int,
+    num_stochastic_iter: int,
+    orthogonalize: bool = False):
+
+    nodes_ensemble = []
+    weights_ensemble = []
+    for _ in tqdm(range(num_stochastic_iter), leave=False):
+
+        _, T = lanczos(mat_vec_mul_closure,
+                       num_params,
+                       num_lanczos_iter,
+                       orthogonalize)
+        L, U = torch.eig(T, eigenvectors=True)
+        L = L[:, 0]
+        _nodes = L
+        _weights = U[0, :]**2
+        nodes_ensemble.append(_nodes.cpu().data.numpy())
+        weights_ensemble.append(_weights.cpu().data.numpy())
+    
+    return np.asarray(nodes_ensemble), np.asarray(weights_ensemble)
+
+
+def spectral_density_estimation(
+    x: np.ndarray,
+    nodes: np.ndarray,
+    weights: np.ndarray,
+    sigma: float):
+
+    K = nodes.shape[0]
+    assert K == weights.shape[0], "Nodes and weights of the density estimator are not equal"
+    _x = x[:, np.newaxis]
+    _n = nodes.flatten()[np.newaxis, :]
+    _w = weights.flatten()[np.newaxis, :]
+    
+    exponent = - 0.5 * (_x - _n)**2 / sigma**2
+    spectrum = (_w * np.exp(exponent)).sum(axis=-1) / K
+    return spectrum
