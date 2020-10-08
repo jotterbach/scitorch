@@ -32,7 +32,9 @@ def test_lanczos():
 
 def test_spectral_density_estimator():
     """
-    Uses Wigner's semi-circle distribution to test this
+    Uses Wigner's semi-circle distribution of symmetric matrices for the test.
+    We first use the Stochastic Lanczos Quadrature to compute the nodes and weights of the kernel density estimator repeatedly. We then compute the eigenvalues of the matrix exactly and perform a histogram count.
+    For the test, we find the closest histogram edges in the ordinates of the spectral estimator and then check that the values of the spectral estimator and the normalized histogram are within a specified error tolerance.
     """
 
     torch.manual_seed(42)
@@ -45,9 +47,12 @@ def test_spectral_density_estimator():
     bins = np.linspace(-100, 100, 101)
     w = bins[1]-bins[0]
     cnt, edges = np.histogram(np.linalg.eigvalsh(A.data.numpy()), bins=bins)
+    normalized_histogram = cnt/(w * cnt.sum())
 
     x = np.arange(-100, 100, .1)
     spec = spectral_density_estimation(x, nodes, weights, 1.)
 
 
-    assert ((spec[np.digitize(edges, x)-1][:-1] - cnt/(w * cnt.sum()))**2).sum() < 1e-4
+    support_points = (np.digitize(edges, x)-1)[:-1]
+
+    assert ((spec[support_points] - normalized_histogram)**2).sum() < 1e-4
